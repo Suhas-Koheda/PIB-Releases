@@ -30,6 +30,7 @@ class PIBDownloader:
 
     def init_session(self):
         response = self.session.get(self.search_url, headers=self.headers)
+        print(response.text)
         response.raise_for_status()
         return response.text
 
@@ -79,7 +80,7 @@ class PIBDownloader:
             headers=self.headers,
             data=payload
         )
-
+        print(response.text)
         response.raise_for_status()
         return response.text
 
