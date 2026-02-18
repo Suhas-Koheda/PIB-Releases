@@ -1,0 +1,17 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Data and Logs
+*.html
+*.json
+!extracted_data.json
+*.log
+
+# OS
+.DS_Store
+.history
