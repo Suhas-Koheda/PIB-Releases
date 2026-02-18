@@ -5,18 +5,20 @@ This project scrapes and parses press releases from the Press Information Bureau
 
 ## Project Structure
 
+```text
 └── PIB/
     ├── README.md
     ├── .gitignore
     ├── parse_release.py      # Core parsing logic using BeautifulSoup
-    ├── process_releases.py   # Multi-threaded scraper and processing script
+    ├── process_releases.py   # High-performance targeted scraper
     └── extracted_data.json   # Output file containing structured JSON data
+```
 
 ## Dashboard Information
 
-We are querying the **PIB Regular Release Dashboard** (`AllRelease.aspx`). 
-- **Type**: Regular/Live Dashboard.
-- **Functionality**: This is the primary portal for current press releases. While it allows historical navigation by date, it is the standard interface used for daily releases, as opposed to the specialized Archive/Advanced Search interface which is often less reliable for direct scraping.
+We are querying the **PIB Delhi Dashboard** (`AllRelease.aspx?reg=3`). 
+- **Type**: Live Dashboard filtered for the Delhi region.
+- **Precision**: By targeting the Delhi region (`reg=3`), the scraper focuses on the primary English press releases, avoiding thousands of redundant regional language duplicates.
 
 ## Setup and Usage
 
@@ -26,18 +28,30 @@ We are querying the **PIB Regular Release Dashboard** (`AllRelease.aspx`).
    ```
 
 2. **Run the Scraper**:
-   To scrape all releases from the provided source:
-   ```bash
-   python3 process_releases.py
-   ```
-   To limit the number of releases for testing:
-   ```bash
-   python3 process_releases.py 20
-   ```
+
+   - **Today's releases (Auto-detect)**:
+     ```bash
+     python3 process_releases.py
+     ```
+
+   - **Specific historical date**:
+     ```bash
+     # Usage: python3 process_releases.py [limit] [day] [month] [year]
+     # Example for Feb 18, 2026:
+     python3 process_releases.py 0 18 2 2026
+     ```
+
+   - **Test the first N items**:
+     ```bash
+     python3 process_releases.py 10
+     ```
 
 ## Key Features
 
-- **Multi-threaded Downloading**: Uses `ThreadPoolExecutor` for high-performance extraction.
-- **Language Detection & Switching**: Automatically detects non-English releases and follows links to their English counterparts.
-- **Automatic Cleanup**: Temporary HTML files are removed after processing to keep the workspace clean.
-- **Structured Output**: Saves final data in a clean, indented JSON format.
+- **English-Targeted Discovery**: The scraper intelligently parses the dashboard to find the English version of every release at the discovery stage, minimizing the need for secondary network requests.
+- **Regional Filtering**: Specifically targets PIB Delhi (`reg=3`) to ensure high data quality and relevance, matching the view seen by most researchers.
+- **In-Memory Discovery**: No clutter. All discovery and PRID extraction happens in memory without creating intermediate HTML files.
+- **Automatic Date Detection**: Automatically targets the current date if no date arguments are provided.
+- **Multi-threaded Performance**: Uses `ThreadPoolExecutor` with 10 workers to process hundreds of releases in parallel, fetching complete content, metadata, and image links in seconds.
+- **Robust Language Logic**: Uses heuristic detection to ensure final data is English, even following cross-language links if a non-English PRID is accidentally encountered.
+- **Clean JSON Output**: Generates structured, indented JSON ready for use in data science or LLM applications.
