@@ -12,14 +12,23 @@ import concurrent.futures
 import threading
 from datetime import datetime
 
+import random
+
+# Common browser User-Agents to rotate
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+]
+
 # Use a session for connection pooling
 session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+# Reduced pool size slightly to be less aggressive
+adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)
 session.mount('https://', adapter)
 session.mount('http://', adapter)
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-})
 
 print_lock = threading.Lock()
 
@@ -70,28 +79,57 @@ def extract_prids(html_content):
                 
     return prids
 
-def download_page(prid):
+def download_page(prid, retries=5):
     url = f"https://pib.gov.in/PressReleasePage.aspx?PRID={prid}"
-    try:
-        response = session.get(url, timeout=30, verify=False)
-        response.raise_for_status()
-        return response.text
-    except Exception as e:
-        safe_print(f"Error downloading {url}: {e}")
-        return None
+    
+    for attempt in range(retries):
+        try:
+            headers = {
+                "User-Agent": random.choice(USER_AGENTS),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://pib.gov.in/AllRelease.aspx"
+            }
+            
+            # More aggressive jitter to look human
+            time.sleep(random.uniform(1.0, 3.0))
+            
+            response = session.get(url, timeout=30, verify=False, headers=headers)
+            
+            if response.status_code == 403:
+                # If we get a 403, the server is onto us. Sleep longer.
+                wait_time = (2 ** attempt) * 5 + random.uniform(5, 10)
+                safe_print(f"!!! 403 Forbidden for {prid}. Waiting {wait_time:.1f}s before retry {attempt+1}/{retries}...")
+                time.sleep(wait_time)
+                continue
+                
+            response.raise_for_status()
+            return response.text
+        except Exception as e:
+            if attempt == retries - 1:
+                safe_print(f"Error downloading {url} after {retries} attempts: {e}")
+            else:
+                time.sleep(random.uniform(2, 5))
+    return None
 
-def fetch_discovery_html(day, month, year):
+def fetch_discovery_html(day, month, year, retries=3):
     url = f"https://www.pib.gov.in/AllRelease.aspx?d={day}&m={month}&y={year}&lang=1&reg=3"
     safe_print(f"Fetching discovery page: {url}")
-    try:
-        s = requests.Session()
-        s.headers.update({"User-Agent": "Mozilla/5.0"})
-        response = s.get(url, timeout=30, verify=False)
-        response.raise_for_status()
-        return response.text
-    except Exception as e:
-        safe_print(f"Error fetching discovery page: {e}")
-        return None
+    
+    for attempt in range(retries):
+        try:
+            headers = {"User-Agent": random.choice(USER_AGENTS)}
+            response = session.get(url, timeout=30, verify=False, headers=headers)
+            
+            if response.status_code == 403:
+                time.sleep(10 + random.uniform(5, 15))
+                continue
+                
+            response.raise_for_status()
+            return response.text
+        except Exception as e:
+            time.sleep(5)
+    return None
 
 def save_as_parquet(results, root_dir="."):
     if not results:
